@@ -199,7 +199,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-04-13 16:40:52" itemprop="dateModified" datetime="2024-04-13T16:40:52+08:00">2024-04-13</time>
+                <time title="修改时间：2024-04-13 16:42:47" itemprop="dateModified" datetime="2024-04-13T16:42:47+08:00">2024-04-13</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -224,36 +224,14 @@
       
           <h2 id="1-现象"><a href="#1-现象" class="headerlink" title="1 现象"></a>1 现象</h2><p>众所周知glibc本身携带的内存管理库ptmalloc内存管理上存在各种各样的问题，导致MySQL这种长时间运行的实例经常出现OOM的现象，具体原因可以参考这一篇文章：<a target="_blank" rel="noopener" href="https://wenfh2020.com/2021/04/08/glibc-memory-leak/">剖析 stl + glibc “内存泄漏” 原因</a>。所以在工业界大家普遍使用jemalloc或者ptmalloc。</p>
 <p>但是使用在配置文件中加入malloc-lib参数，指定使用jemalloc后，出现了实例无法启动的情况：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">2023-10-24T07:40:36.995687Z mysqld_safe mysqld from pid file /home/work/mysql-5.7.38//var/mysql.pid ended</span><br><span class="line">2023-10-24T07:43:14.917924Z mysqld_safe Logging to &#x27;/home/work/mysql-5.7.38//log/mysql.err&#x27;.</span><br><span class="line">2023-10-24T07:43:14.937321Z mysqld_safe Starting mysqld daemon with databases from /home/work/mysql-5.7.38//var</span><br><span class="line">nohup: relocation error: /opt/compiler/gcc-8.2/lib/libpthread.so.0: symbol __libc_vfork, version GLIBC_PRIVATE not defined in file libc.so.6 with link time reference</span><br><span class="line">2023-10-24T07:43:14.943059Z mysqld_safe mysqld from pid file /home/work/mysql-5.7.38//var/mysql.pid ended</span><br></pre></td></tr></table></figure>
-
-<h2 id="2-原因分析及问题定位"><a href="#2-原因分析及问题定位" class="headerlink" title="2 原因分析及问题定位"></a>2 原因分析及问题定位</h2><p>线上的机器环境中有两套工具链，一是系统路径下的（<code>/usr/bin</code>, <code>/usr/lib/</code>），glibc版本为2.17；二是后来人工部署并使用的opt路径下的（<code>/opt/compiler/gcc-8.2</code>），glibc版本为2.29。</p>
-<p>（不得不承认我们的环境确实非常混乱，我也不知道为什么不用docke。）</p>
-<p>线上所使用的实例是由opt目录下的gcc编译出来的，而nohup是系统路径下的二进制工具。</p>
-<p>根据报错信息，报错原因是<code>libpthread.so</code>所需要的一个外部符号<code>__libc_vfork</code>并没有在装载的<code>libc.so</code>里找到：</p>
-<img src="/2023/11/13/MySQL%E6%8D%89%E8%99%AB%EF%BC%9Aglibc%E5%AF%BC%E8%87%B4mysqld-safe%E6%97%A0%E6%B3%95%E5%90%AF%E5%8A%A8/vfork.png" class>
-
-<p>增加<code>malloc-lib</code>参数后，实际上mysqld_safe是将其处理为一个<code>LD_PRELOAD</code>参数：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">cmd=&quot;`mysqld_ld_preload_text`$NOHUP_NICENESS&quot;</span><br><span class="line"></span><br><span class="line">for i in  &quot;$ledir/$MYSQLD&quot; &quot;$defaults&quot; &quot;--basedir=$MY_BASEDIR_VERSION&quot; \</span><br><span class="line">  &quot;--datadir=$DATADIR&quot; &quot;--plugin-dir=$plugin_dir&quot; &quot;$USER_OPTION&quot;</span><br><span class="line">do</span><br><span class="line">  cmd=&quot;$cmd &quot;`shell_quote_string &quot;$i&quot;`</span><br><span class="line">done</span><br><span class="line">cmd=&quot;$cmd $args&quot;</span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">Avoid <span class="string">&#x27;nohup: ignoring input&#x27;</span> warning</span></span><br><span class="line">test -n &quot;$NOHUP_NICENESS&quot; &amp;&amp; cmd=&quot;$cmd &lt; /dev/null&quot;</span><br></pre></td></tr></table></figure>
-
-<p>在mysqld_safe的输出信息中也可以得到：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysqld_safe Adding &#x27;/home/work/mysql-5.7.38//lib/jemalloc/lib/libjemalloc.so&#x27; to LD_PRELOAD for mysqld</span><br></pre></td></tr></table></figure>
-
-<p>在启动mysqld时，会在开头添加一段<code>LD_PRELOAD</code>先将jemalloc的相关库装载进去。</p>
-<p>strace可以捕获和记录进程的所有系统调用，以及这个进程接收的所有信号。</p>
-<p>使用strace分析在系统nohup下，增加对jemalloc库的LD_PRELOAD后启动mysqld的文件打开结果如下。所有文件都有一个寻找的路径，为了方便阅读，我省略了一些可执行文件依次寻找的过程中未找到的一些记录。 </p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">$ strace -f -e trace=file -o strace_jemalloc.txt <span class="built_in">env</span> LD_PRELOAD=/home/work/mysql-5.7.38//lib/jemalloc/lib/libjemalloc.so <span class="built_in">nohup</span> ./mysql-5.7.38/libexec/mysqld --version</span></span><br><span class="line"></span><br><span class="line">19446 execve(&quot;/usr/bin/env&quot;, [&quot;env&quot;, &quot;LD_PRELOAD=/home/work/mys&quot;..., &quot;nohup&quot;, &quot;./mysql-5.7.38/libexec/mysqld&quot;, &quot;--version&quot;], [/* 42 vars */]) = 0</span><br><span class="line">19446 faccessat(AT_FDCWD, &quot;/etc/ld.so.preload&quot;, R_OK) = -1 ENOENT (No such file or directory)</span><br><span class="line">19446 openat(AT_FDCWD, &quot;/etc/ld.so.cache&quot;, O_RDONLY|O_CLOEXEC) = 3</span><br><span class="line">19446 openat(AT_FDCWD, &quot;/lib64/libc.so.6&quot;, O_RDONLY|O_CLOEXEC) = 3</span><br><span class="line">19446 openat(AT_FDCWD, &quot;/usr/lib/locale/locale-archive&quot;, O_RDONLY|O_CLOEXEC) = 3</span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">省略了在PATH下寻找<span class="built_in">nohup</span>的一些过程 <span class="comment">#</span></span></span><br><span class="line">19446 execve(&quot;/usr/bin/nohup&quot;, [&quot;nohup&quot;, &quot;./mysql-5.7.38/libexec/mysqld&quot;, &quot;--version&quot;], [/* 43 vars */]) = 0</span><br><span class="line">19446 openat(AT_FDCWD, &quot;/home/work/mysql-5.7.38//lib/jemalloc/lib/libjemalloc.so&quot;, O_RDONLY|O_CLOEXEC) = 3</span><br><span class="line">19446 faccessat(AT_FDCWD, &quot;/etc/ld.so.preload&quot;, R_OK) = -1 ENOENT (No such file or directory)</span><br><span class="line">19446 openat(AT_FDCWD, &quot;/etc/ld.so.cache&quot;, O_RDONLY|O_CLOEXEC) = 3</span><br><span class="line">19446 openat(AT_FDCWD, &quot;/lib64/libc.so.6&quot;, O_RDONLY|O_CLOEXEC) = 3</span><br><span class="line">19446 openat(AT_FDCWD, &quot;/opt/compiler/gcc-8.2/lib/tls/aarch64/libm.so.6&quot;, O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)</span><br><span class="line">19446 newfstatat(AT_FDCWD, &quot;/opt/compiler/gcc-8.2/lib/tls/aarch64&quot;, 0xffffeb03c0e0, 0) = -1 ENOENT (No such file or directory)</span><br><span class="line">19446 openat(AT_FDCWD, &quot;/opt/compiler/gcc-8.2/lib/tls/libm.so.6&quot;, O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)</span><br><span class="line">19446 newfstatat(AT_FDCWD, &quot;/opt/compiler/gcc-8.2/lib/tls&quot;, 0xffffeb03c0e0, 0) = -1 ENOENT (No such file or directory)</span><br><span class="line">19446 openat(AT_FDCWD, &quot;/opt/compiler/gcc-8.2/lib/aarch64/libm.so.6&quot;, O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)</span><br><span class="line">19446 newfstatat(AT_FDCWD, &quot;/opt/compiler/gcc-8.2/lib/aarch64&quot;, 0xffffeb03c0e0, 0) = -1 ENOENT (No such file or directory)</span><br><span class="line">19446 openat(AT_FDCWD, &quot;/opt/compiler/gcc-8.2/lib/libm.so.6&quot;, O_RDONLY|O_CLOEXEC) = 3</span><br><span class="line">19446 openat(AT_FDCWD, &quot;/opt/compiler/gcc-8.2/lib/libstdc++.so.6&quot;, O_RDONLY|O_CLOEXEC) = 3</span><br><span class="line">19446 openat(AT_FDCWD, &quot;/opt/compiler/gcc-8.2/lib/libdl.so.2&quot;, O_RDONLY|O_CLOEXEC) = 3</span><br><span class="line">19446 openat(AT_FDCWD, &quot;/opt/compiler/gcc-8.2/lib/libgcc_s.so.1&quot;, O_RDONLY|O_CLOEXEC) = 3</span><br><span class="line">19446 openat(AT_FDCWD, &quot;/opt/compiler/gcc-8.2/lib/libpthread.so.0&quot;, O_RDONLY|O_CLOEXEC) = 3</span><br><span class="line">19446 +++ exited with 127 +++</span><br></pre></td></tr></table></figure>
-
-<p>借助strace多次进行分析，确认使用<code>LD_PRELOAD</code>后，库的链接顺序为：</p>
-<ol>
-<li><code>LD_PRELOAD</code>指定的库</li>
-<li>之后接的可执行文件依赖的库</li>
-<li><code>LD_PRELOAD</code>指定库依赖的库</li>
-</ol>
-<p>也就是说，jemalloc依赖的库的链接路径和其后接的可执行文件依赖的库的路径高度相关。</p>
-<p>在本次遇到的现象中，nohup为系统库，用到了系统路径下的<code>libc.so</code>，因此在链接完<code>libjemalloc.so</code>后，将nohup依赖的库（最关键的就是<code>/lib64/libc.so.6</code>）链接进来。之后再装载libjemalloc.so所依赖的库时，它所依赖的<code>/opt/compiler/gcc-8.2/lib/libpthread.so</code>的符号<code>__libc_vfork</code>无法在系统路径下的<code>/lib64/libc.so.6</code>找到，从而触发异常，导致实例无法启动。</p>
-<p>因此，如果用我们部署的gcc-8.2工具链编译出来的nohup，就会装载<code>/opt/compiler/gcc-8.2/lib/libc.so</code>，而非系统路径下的<code>libc.so</code>文件，也就不会导致<code>libjemalloc.so</code>（实际上是其依赖的<code>/opt/compiler/gcc-8.2/lib/libpthread.so</code>）出现符号未定义的问题。</p>
-<h2 id="3-解决方案"><a href="#3-解决方案" class="headerlink" title="3 解决方案"></a>3 解决方案</h2><p>使用gcc-8.2编译的nohup替换系统路径下的nohup。</p>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2023/11/13/MySQL%E6%8D%89%E8%99%AB%EF%BC%9Aglibc%E5%AF%BC%E8%87%B4mysqld-safe%E6%97%A0%E6%B3%95%E5%90%AF%E5%8A%A8/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -378,7 +356,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-04-13 16:21:58" itemprop="dateModified" datetime="2024-04-13T16:21:58+08:00">2024-04-13</time>
+                <time title="修改时间：2024-04-13 16:26:12" itemprop="dateModified" datetime="2024-04-13T16:26:12+08:00">2024-04-13</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
