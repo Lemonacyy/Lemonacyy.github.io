@@ -23,7 +23,7 @@
   <meta name="description" content="1 背景原子性，通俗来说就是指一条命令要么全部执行，要么全部不执行。 当我们使用MySQL来存储应用数据的时候，MySQL同样也需要存储这些元数据。在MySQL8.0之前的版本中，这些元数据被存放在许多不同的文件中（.FRM，.PAR，.OPT，.TRN，.TRG文件等），这就导致了一系列弊端，包括数据可能不一致、API接口的复杂性等等，在之前的月报[5]中也有详细描述。元数据被放在许多不同的文件">
 <meta property="og:type" content="article">
 <meta property="og:title" content="MySQL功能介绍：DDL log与原子DDL的实现">
-<meta property="og:url" content="https://lemonacyy.github.io/2022/12/13/DDL_log%E4%B8%8E%E5%8E%9F%E5%AD%90DDL%E7%9A%84%E5%AE%9E%E7%8E%B0/index.html">
+<meta property="og:url" content="https://lemonacyy.github.io/2022/12/13/MySQL%E5%8A%9F%E8%83%BD%E4%BB%8B%E7%BB%8D%EF%BC%9ADDL_log%E4%B8%8E%E5%8E%9F%E5%AD%90DDL%E7%9A%84%E5%AE%9E%E7%8E%B0/index.html">
 <meta property="og:site_name" content="LEMONACY&#39;S HOUSE">
 <meta property="og:description" content="1 背景原子性，通俗来说就是指一条命令要么全部执行，要么全部不执行。 当我们使用MySQL来存储应用数据的时候，MySQL同样也需要存储这些元数据。在MySQL8.0之前的版本中，这些元数据被存放在许多不同的文件中（.FRM，.PAR，.OPT，.TRN，.TRG文件等），这就导致了一系列弊端，包括数据可能不一致、API接口的复杂性等等，在之前的月报[5]中也有详细描述。元数据被放在许多不同的文件">
 <meta property="og:locale" content="zh_CN">
@@ -37,7 +37,7 @@
 <meta name="twitter:card" content="summary">
 <meta name="twitter:image" content="https://pic.imgdb.cn/item/662377890ea9cb14038e2fd3.png">
 
-<link rel="canonical" href="https://lemonacyy.github.io/2022/12/13/DDL_log%E4%B8%8E%E5%8E%9F%E5%AD%90DDL%E7%9A%84%E5%AE%9E%E7%8E%B0/">
+<link rel="canonical" href="https://lemonacyy.github.io/2022/12/13/MySQL%E5%8A%9F%E8%83%BD%E4%BB%8B%E7%BB%8D%EF%BC%9ADDL_log%E4%B8%8E%E5%8E%9F%E5%AD%90DDL%E7%9A%84%E5%AE%9E%E7%8E%B0/">
 
 
 <script id="page-configurations">
@@ -176,7 +176,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://lemonacyy.github.io/2022/12/13/DDL_log%E4%B8%8E%E5%8E%9F%E5%AD%90DDL%E7%9A%84%E5%AE%9E%E7%8E%B0/">
+    <link itemprop="mainEntityOfPage" href="https://lemonacyy.github.io/2022/12/13/MySQL%E5%8A%9F%E8%83%BD%E4%BB%8B%E7%BB%8D%EF%BC%9ADDL_log%E4%B8%8E%E5%8E%9F%E5%AD%90DDL%E7%9A%84%E5%AE%9E%E7%8E%B0/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/uploads/avatar.jpg">
@@ -444,7 +444,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">3</span>
+          <span class="site-state-item-count">4</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -457,7 +457,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">4</span>
+        <span class="site-state-item-count">5</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

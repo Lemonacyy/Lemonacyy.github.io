@@ -20,30 +20,37 @@
     var CONFIG = {"hostname":"lemonacyy.github.io","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
-  <meta name="description" content="Make Lemons into Lemonade">
-<meta property="og:type" content="website">
-<meta property="og:title" content="LEMONACY&#39;S HOUSE">
-<meta property="og:url" content="https://lemonacyy.github.io/index.html">
+  <meta name="description" content="主从同步建立逻辑 masterbinlog dump过程 源码分析注：以下基于异步复制 12345678910111213141516171819202122232425262728293031323334353637383940414243444546474849505152535455565758596061626364656667sql_parse.cc: dispatch_command">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MySQL源码分析：主从同步">
+<meta property="og:url" content="https://lemonacyy.github.io/2023/11/13/MySQL%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%9A%E4%B8%BB%E4%BB%8E%E5%90%8C%E6%AD%A5/index.html">
 <meta property="og:site_name" content="LEMONACY&#39;S HOUSE">
-<meta property="og:description" content="Make Lemons into Lemonade">
+<meta property="og:description" content="主从同步建立逻辑 masterbinlog dump过程 源码分析注：以下基于异步复制 12345678910111213141516171819202122232425262728293031323334353637383940414243444546474849505152535455565758596061626364656667sql_parse.cc: dispatch_command">
 <meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://pic.imgdb.cn/item/662379ff0ea9cb140393d55f.jpg">
+<meta property="og:image" content="https://pic.imgdb.cn/item/66237a300ea9cb1403943141.png">
+<meta property="article:published_time" content="2023-11-13T08:28:51.000Z">
+<meta property="article:modified_time" content="2024-04-20T08:26:34.952Z">
 <meta property="article:author" content="lemonacy">
+<meta property="article:tag" content="MySQL">
+<meta property="article:tag" content="Code">
 <meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://pic.imgdb.cn/item/662379ff0ea9cb140393d55f.jpg">
 
-<link rel="canonical" href="https://lemonacyy.github.io/">
+<link rel="canonical" href="https://lemonacyy.github.io/2023/11/13/MySQL%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%9A%E4%B8%BB%E4%BB%8E%E5%90%8C%E6%AD%A5/">
 
 
 <script id="page-configurations">
   // https://hexo.io/docs/variables.html
   CONFIG.page = {
     sidebar: "",
-    isHome : true,
-    isPost : false,
+    isHome : false,
+    isPost : true,
     lang   : 'zh-CN'
   };
 </script>
 
-  <title>LEMONACY'S HOUSE</title>
+  <title>MySQL源码分析：主从同步 | LEMONACY'S HOUSE</title>
   
 
 
@@ -162,91 +169,10 @@
         <div class="content-wrap">
           
 
-          <div class="content index posts-expand">
+          <div class="content post posts-expand">
             
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://lemonacyy.github.io/2023/11/13/MySQL%E6%8D%89%E8%99%AB%EF%BC%9Aglibc%E5%AF%BC%E8%87%B4mysqld-safe%E6%97%A0%E6%B3%95%E5%90%AF%E5%8A%A8/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/uploads/avatar.jpg">
-      <meta itemprop="name" content="lemonacy">
-      <meta itemprop="description" content="Make Lemons into Lemonade">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="LEMONACY'S HOUSE">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2023/11/13/MySQL%E6%8D%89%E8%99%AB%EF%BC%9Aglibc%E5%AF%BC%E8%87%B4mysqld-safe%E6%97%A0%E6%B3%95%E5%90%AF%E5%8A%A8/" class="post-title-link" itemprop="url">MySQL捉虫：glibc导致mysqld_safe无法启动</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2023-11-13 16:28:51" itemprop="dateCreated datePublished" datetime="2023-11-13T16:28:51+08:00">2023-11-13</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-04-20 16:12:17" itemprop="dateModified" datetime="2024-04-20T16:12:17+08:00">2024-04-20</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/MySQL/" itemprop="url" rel="index"><span itemprop="name">MySQL</span></a>
-                </span>
-            </span>
-
-          
-
-        </div>
-      </header>
 
     
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h2 id="1-现象"><a href="#1-现象" class="headerlink" title="1 现象"></a>1 现象</h2><p>glibc本身携带的内存管理库ptmalloc内存管理上存在各种各样的问题，导致MySQL这种长时间运行的实例经常出现OOM的现象，具体原因可以参考这一篇文章：<a target="_blank" rel="noopener" href="https://wenfh2020.com/2021/04/08/glibc-memory-leak/">剖析 stl + glibc “内存泄漏” 原因</a>。所以在工业界大家普遍使用jemalloc或者ptmalloc。</p>
-<p>但是使用在配置文件中加入<code>malloc-lib</code>参数，指定使用jemalloc后，出现了实例无法启动的情况：</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2023/11/13/MySQL%E6%8D%89%E8%99%AB%EF%BC%9Aglibc%E5%AF%BC%E8%87%B4mysqld-safe%E6%97%A0%E6%B3%95%E5%90%AF%E5%8A%A8/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
@@ -262,10 +188,9 @@
       <meta itemprop="name" content="LEMONACY'S HOUSE">
     </span>
       <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2023/11/13/MySQL%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%9A%E4%B8%BB%E4%BB%8E%E5%90%8C%E6%AD%A5/" class="post-title-link" itemprop="url">MySQL源码分析：主从同步</a>
-        </h2>
+        <h1 class="post-title" itemprop="name headline">
+          MySQL源码分析：主从同步
+        </h1>
 
         <div class="post-meta">
             <span class="post-meta-item">
@@ -304,7 +229,7 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <h1 id="主从同步建立逻辑"><a href="#主从同步建立逻辑" class="headerlink" title="主从同步建立逻辑"></a>主从同步建立逻辑</h1><p><img src="https://pic.imgdb.cn/item/662379ff0ea9cb140393d55f.jpg" alt="replication"></p>
+        <h1 id="主从同步建立逻辑"><a href="#主从同步建立逻辑" class="headerlink" title="主从同步建立逻辑"></a>主从同步建立逻辑</h1><p><img src="https://pic.imgdb.cn/item/662379ff0ea9cb140393d55f.jpg" alt="replication"></p>
 <h1 id="master"><a href="#master" class="headerlink" title="master"></a>master</h1><h2 id="binlog-dump过程"><a href="#binlog-dump过程" class="headerlink" title="binlog dump过程"></a>binlog dump过程</h2><p><img src="https://pic.imgdb.cn/item/66237a300ea9cb1403943141.png" alt="binlog_dump"></p>
 <h2 id="源码分析"><a href="#源码分析" class="headerlink" title="源码分析"></a>源码分析</h2><p>注：以下基于异步复制</p>
 <figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br></pre></td><td class="code"><pre><span class="line">sql_parse.cc: dispatch_command</span><br><span class="line">  |- sql_parse.cc: register_slave                      // 将slave传来的用户信息注册到master上，包活host，uesr和password</span><br><span class="line">  |- sql_parse.cc: com_binlog_dump_gtid                // 从库执行request_dump，向主库发生命令</span><br><span class="line">  |  |                                                 // 在本case中，选择开启GTID与master_auto_position进行分析</span><br><span class="line">  |  |                                                 // 不开master_auto_position的话会调用com_binlog_dump函数</span><br><span class="line">  |  |                 // 读取pos、flags和server-id</span><br><span class="line">  |  |- rpl_master.cc: kill_zombie_dump_threads        // 检查该从库之前是否有对应的master dump线程没有关闭，如果有则将其关闭</span><br><span class="line">  |  |                                                 // master dump线程发完binlog事件后会进入等待状态，如果此时slave停止，然后重新连接到master，那么主库上会有2个dump线程</span><br><span class="line">  |  |                                                 // 一个是之前建立的处于等待binlog更新的dump线程，另一个是新建立连接的dump线程，此时之前建立的dump线程需要关闭</span><br><span class="line">  |  |                 // 有一个叫gtid_string的参数，是slave执行到的最后一个的GTID值，但就打了个log就free掉了，看起来没什么用的样子</span><br><span class="line">  |  |- rpl_master.cc: mysql_binlog_send               // 如果未开启auto position，会指定文件名和位置</span><br><span class="line">  |  |  |                                              // 开启的话name是空的, pos是4，4是binlog文件开头magic number的大小</span><br><span class="line">  |  |  |- rpl_master.cc: sender.run()</span><br><span class="line">  |  |  |  |                        // 设置开始发送的binlog文件名和文件位置，文件名是当前slave读到的master binlog的文件，位置是4，如果之前reset过的话会设置为binlog的最后一个文件，然后逐步开始往前慢慢找</span><br><span class="line">  |  |  |  |- rpl_binlog_sender.cc: init               // 初始化上下文，检查dump请求是否合法，检查binlog的状态是否正常，会根据slave传来的dump命令更新m_exclude_gtid</span><br><span class="line">  |  |  |  |  |- rpl_binlog_sender.cc: init_heartbeat_period        // 启动心跳</span><br><span class="line">  |  |  |  |  |                        // 给packet分配空间</span><br><span class="line">  |  |  |  |  |                        // 检查是否开启GTID</span><br><span class="line">  |  |  |  |  |                        // 一系列检查和初始化</span><br><span class="line">  |  |  |  |  |- rpl_binlog_sender.cc: check_start_file             // 进行从库GTID值是否可行的判断，确保从库的gtid_executed必须是主库的子集</span><br><span class="line">  |  |  |  |  |                                                     // 取出从库关于主库server_uuid的 GTID是小于等于 主库的GTID 如果不是则报错</span><br><span class="line">  |  |  |  |  |                                                     // 判断主库的主库的GTID_PURGED是否是从库GTID的子集 不是则报错, 简单的说就是主库已经清理了从库拉取需要的GTID</span><br><span class="line">  |  |  |  |  |                                                     // 还存在一种特殊情况比如主库手动删除了binary, 这就涉及到实际的binlog扫描, </span><br><span class="line">  |  |  |  |  |- rpl_binlog_sender.cc: RUN_HOOK(Binlog_transmit_delegate::transmit_start)    // 这里返回的是0，不会调用函数</span><br><span class="line">  |  |  |  |  |                                                                              // 如果开启了半同步复制会调用binlog_transmit_delegate -&gt; transmit_start，然后调入repl_semi_binlog_dump_start，在启动的时候判断主从是否是半同步，如果是需要加入到ack receiver进行管理和更改统计值Rpl_semi_sync_master_clients</span><br><span class="line">  |  |  |  |  // 开启循环1</span><br><span class="line">  |  |  |  |- rpl_binlog_sender.cc: fake_rotate_event     // 解决之前没有rotate event发送的场景，log_file是现在slave读到的master binlog的文件名，start_pos是4</span><br><span class="line">  |  |  |  |- rpl_binlog_sender.cc: open_binlog_file      // log_file是现在slave读到的master binlog的文件名</span><br><span class="line">  |  |  |  |  |- mysql_file.h: mysql_file_open            // 以只读的形式打开对应的binlog文件</span><br><span class="line">  |  |  |  |  |- mf_iocache.c: init_io_cache_ext          // 初始化IO CACHE中的各种变量，分配内存</span><br><span class="line">  |  |  |  |- rpl_binlog_sender.cc: send_binlog        // 发送二进制日志</span><br><span class="line">  |  |  |  |  |- rpl_binlog_sender.cc: send_format_description_event // 每次打开binlog文件时正式发送的第一个event</span><br><span class="line">  |  |  |  |  | // 设置开始位置</span><br><span class="line">  |  |  |  |  | // 开启循环2</span><br><span class="line">  |  |  |  |  |- rpl_binlog_sender.cc: get_binlog_end_pos           // 不断的等新的log_cache(IO CACHE)，确定结束位置end_pos</span><br><span class="line">  |  |  |  |  |  |                        // do-while循环</span><br><span class="line">  |  |  |  |  |  |- rpl_binlog_sender.cc: mysql_bin_log.is_active   // 判断当前的binlog文件是否在被持续写入</span><br><span class="line">  |  |  |  |  |  |                        // 如果没有，比较当前dump线程的读取位置和binlog文件的结束位置，如果相等返回0，如果不等返回文件结束位置</span><br><span class="line">  |  |  |  |  |  |                        // 如果有，说明现在master还在持续产生binlog，判断当前dump线程的读取位置和binlog文件结束位置，如果不等就返回结束位置</span><br><span class="line">  |  |  |  |  |  |                        // 如果相等，说明数据可能还在net buffer里，刷新一下然后继续等</span><br><span class="line">  |  |  |  |  |- rpl_binlog_sender.cc: send_events                  // 发送log_cache</span><br><span class="line">  |  |  |  |  |  |- rpl_binlog_sender.cc: read_event                // 读取event主函数</span><br><span class="line">  |  |  |  |  |  |  |- rpl_binlog_sender.cc: peek_event_length      // 读取event长度</span><br><span class="line">  |  |  |  |  |  |  |- rpl_binlog_sender.cc: reset_transmit_packet  // 为event发送重置线程的传输包缓冲大小</span><br><span class="line">  |  |  |  |  |  |  |- rpl_binlog_sender.cc: read_log_event         // 读取event，写入packet包内存</span><br><span class="line">  |  |  |  |  |  |  |- rpl_binlog_sender.cc: set_last_pos           // 设置下一次读取位置</span><br><span class="line">  |  |  |  |  |  |- rpl_binlog_sender.cc: check_event_type          // 检查事件类型</span><br><span class="line">  |  |  |  |  |  |                                                  // 如果是auto_position=ON不能有匿名event的存在 如果有则报错</span><br><span class="line">  |  |  |  |  |  |                                                  // 如果是GTID_MODE=ON不能有匿名event 存在 否则报错</span><br><span class="line">  |  |  |  |  |  |                                                  // 如果是GITD_MODE=OFF不能有GTID的event存在</span><br><span class="line">  |  |  |  |  |  |  // ####发送前####</span><br><span class="line">  |  |  |  |  |  |- rpl_binlog_sender.cc: before_send_hook          // 设置包头的sync位，告知slave是否等待event回复</span><br><span class="line">  |  |  |  |  |  |- rpl_binlog_sender.cc: skip_event                // mysql维护了一个gtid set，所有在这个集合里的事件都不能发送给slave</span><br><span class="line">  |  |  |  |  |  |                                                  // 如果skip：可能由于跳过的event很多，造成在心跳周期内没有event发送给从库，导致从库认为主库宕机</span><br><span class="line">  |  |  |  |  |  |                                                  //          为避免这种情况，在跳过event过程中，也会进行周期时间检查，定期发送心跳事件</span><br><span class="line">  |  |  |  |  |  |- rpl_binlog_sender.cc: send_heartbeat_event      // 发送心跳包事件</span><br><span class="line">  |  |  |  |  |  |- rpl_binlog_sender.cc: send_packet               // 向slave发送包</span><br><span class="line">  |  |  |  |  |  |- rpl_binlog_sender.cc: after_send_hook           // 如果事件可以跳过，假装收到slave的回复，直接上报当前读取的binlog位置</span><br><span class="line">  |  |  |  |  |  |                                                  // 否则， 读取slave的回复，以便了解进度，并上报slave回复的位置</span><br><span class="line">  |  |  |  |  |  |  |- rpl_binlog_sender.cc: RUN_HOOK               // binlog_transmit-&gt;after_send_event，如果开了半同步复制会调用repl_semi_after_send_event</span><br><span class="line">  |  |  |  |  | // 关闭循环2</span><br><span class="line">  |  |  |  |- rpl_binlog_sender.cc: set_last_file                   // 当前这个binlog文件读完了，设置下一个要读的文件</span><br><span class="line">  |  |  |  |- rpl_binlog_sender.cc: find_next_log</span><br><span class="line">  |  |  |  |- rpl_binlog_sender.cc: end_io_cache</span><br><span class="line">  |  |  |  |- rpl_binlog_sender.cc: mysql_file_close</span><br><span class="line">  |  |  |  | // 关闭循环1</span><br><span class="line">  |  |- rpl_master.cc: unregister_slave                // 每次发送完会解除注册</span><br></pre></td></tr></table></figure>
@@ -320,183 +245,37 @@
 <h1 id="参考文档"><a href="#参考文档" class="headerlink" title="参考文档"></a>参考文档</h1><p>[1] <a target="_blank" rel="noopener" href="https://segmentfault.com/a/1190000037509500">【Mysql源码分析】基于行的复制实现之“主从关系建立”</a></p>
 <p>[2] <a target="_blank" rel="noopener" href="https://www.jianshu.com/p/586d533501a7">MySQL dump线程分析</a></p>
 
-      
     </div>
 
     
     
     
+
       <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
+          <div class="post-tags">
+              <a href="/tags/MySQL/" rel="tag"># MySQL</a>
+              <a href="/tags/Code/" rel="tag"># Code</a>
+          </div>
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://lemonacyy.github.io/2023/07/30/RocksDB%E5%85%A5%E9%97%A8/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/uploads/avatar.jpg">
-      <meta itemprop="name" content="lemonacy">
-      <meta itemprop="description" content="Make Lemons into Lemonade">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="LEMONACY'S HOUSE">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2023/07/30/RocksDB%E5%85%A5%E9%97%A8/" class="post-title-link" itemprop="url">RocksDB入门</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2023-07-30 23:43:24" itemprop="dateCreated datePublished" datetime="2023-07-30T23:43:24+08:00">2023-07-30</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-03-31 00:07:44" itemprop="dateModified" datetime="2024-03-31T00:07:44+08:00">2024-03-31</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/RocksDB/" itemprop="url" rel="index"><span itemprop="name">RocksDB</span></a>
-                </span>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p><a href="/slices/MyRocks-intro.pptx" download="MyRocks-intro.pptx">下载PPT</a></p>
-<div class="pdfobject-container" data-target="/pdf/MyRocks-intro.pdf" data-height="500px"></div>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://lemonacyy.github.io/2022/12/13/MySQL%E5%8A%9F%E8%83%BD%E4%BB%8B%E7%BB%8D%EF%BC%9ADDL_log%E4%B8%8E%E5%8E%9F%E5%AD%90DDL%E7%9A%84%E5%AE%9E%E7%8E%B0/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/uploads/avatar.jpg">
-      <meta itemprop="name" content="lemonacy">
-      <meta itemprop="description" content="Make Lemons into Lemonade">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="LEMONACY'S HOUSE">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/12/13/MySQL%E5%8A%9F%E8%83%BD%E4%BB%8B%E7%BB%8D%EF%BC%9ADDL_log%E4%B8%8E%E5%8E%9F%E5%AD%90DDL%E7%9A%84%E5%AE%9E%E7%8E%B0/" class="post-title-link" itemprop="url">MySQL功能介绍：DDL log与原子DDL的实现</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2022-12-13 14:23:12" itemprop="dateCreated datePublished" datetime="2022-12-13T14:23:12+08:00">2022-12-13</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-04-20 16:11:01" itemprop="dateModified" datetime="2024-04-20T16:11:01+08:00">2024-04-20</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/MySQL/" itemprop="url" rel="index"><span itemprop="name">MySQL</span></a>
-                </span>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h2 id="1-背景"><a href="#1-背景" class="headerlink" title="1 背景"></a>1 背景</h2><p>原子性，通俗来说就是指一条命令要么全部执行，要么全部不执行。</p>
-<p>当我们使用MySQL来存储应用数据的时候，MySQL同样也需要存储这些元数据。在MySQL8.0之前的版本中，这些元数据被存放在许多不同的文件中（.FRM，.PAR，.OPT，.TRN，.TRG文件等），这就导致了一系列弊端，包括数据可能不一致、API接口的复杂性等等，在之前的月报<a target="_blank" rel="noopener" href="http://mysql.taobao.org/monthly/2018/03/02/">[5]</a>中也有详细描述。元数据被放在许多不同的文件中，导致数据可能不一致的具体表现为：</p>
-<ol>
-<li>Server层的metadata和Storage Engine层的metadata数据不一致；</li>
-<li>InnoDB中的metadata和数据不一致；</li>
-<li>Binlog和数据不一致。</li>
-</ol>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2022/12/13/MySQL%E5%8A%9F%E8%83%BD%E4%BB%8B%E7%BB%8D%EF%BC%9ADDL_log%E4%B8%8E%E5%8E%9F%E5%AD%90DDL%E7%9A%84%E5%AE%9E%E7%8E%B0/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
         
-      
-    </div>
 
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/07/30/RocksDB%E5%85%A5%E9%97%A8/" rel="prev" title="RocksDB入门">
+      <i class="fa fa-chevron-left"></i> RocksDB入门
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2023/11/13/MySQL%E6%8D%89%E8%99%AB%EF%BC%9Aglibc%E5%AF%BC%E8%87%B4mysqld-safe%E6%97%A0%E6%B3%95%E5%90%AF%E5%8A%A8/" rel="next" title="MySQL捉虫：glibc导致mysqld_safe无法启动">
+      MySQL捉虫：glibc导致mysqld_safe无法启动 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
       </footer>
+    
   </article>
   
   
-  
-
-
   
 
 
@@ -549,6 +328,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%B8%BB%E4%BB%8E%E5%90%8C%E6%AD%A5%E5%BB%BA%E7%AB%8B%E9%80%BB%E8%BE%91"><span class="nav-text">主从同步建立逻辑</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#master"><span class="nav-text">master</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#binlog-dump%E8%BF%87%E7%A8%8B"><span class="nav-text">binlog dump过程</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90"><span class="nav-text">源码分析</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#slave"><span class="nav-text">slave</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90-1"><span class="nav-text">源码分析</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#io%E7%BA%BF%E7%A8%8B"><span class="nav-text">io线程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#sql%E7%BA%BF%E7%A8%8B"><span class="nav-text">sql线程</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E6%96%87%E6%A1%A3"><span class="nav-text">参考文档</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
