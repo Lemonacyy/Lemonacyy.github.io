@@ -182,7 +182,7 @@
       <header class="post-header">
         <h2 class="post-title" itemprop="name headline">
           
-            <a href="/2024/02/07/MySQL%E5%8A%9F%E8%83%BD%E4%BB%8B%E7%BB%8D%EF%BC%9A%E4%BD%BF%E7%94%A8Optimizer_Trace%E5%88%86%E6%9E%90%E4%BC%98%E5%8C%96%E5%99%A8%E8%A1%8C%E4%B8%BA/" class="post-title-link" itemprop="url">MySQL���ܽ��ܣ�ʹ��Optimizer_Trace�����Ż�����Ϊ</a>
+            <a href="/2024/02/07/MySQL%E5%8A%9F%E8%83%BD%E4%BB%8B%E7%BB%8D%EF%BC%9A%E4%BD%BF%E7%94%A8Optimizer_Trace%E5%88%86%E6%9E%90%E4%BC%98%E5%8C%96%E5%99%A8%E8%A1%8C%E4%B8%BA/" class="post-title-link" itemprop="url">MySQL功能介绍：使用Optimizer_Trace分析优化器行为</a>
         </h2>
 
         <div class="post-meta">
@@ -199,7 +199,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-04-20 16:46:38" itemprop="dateModified" datetime="2024-04-20T16:46:38+08:00">2024-04-20</time>
+                <time title="修改时间：2024-04-22 23:46:45" itemprop="dateModified" datetime="2024-04-22T23:46:45+08:00">2024-04-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -222,9 +222,9 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <p>ע�����Ļ���MySQL8.0.32���Ż���ʹ��CBO�ɱ�ģ�͡�</p>
-<h1 id="1-���ܸ���"><a href="#1-���ܸ���" class="headerlink" title="1 ���ܸ���"></a>1 ���ܸ���</h1><p>���Ż������Ը���ִ�����Ľ������Ż���ִ�е�ȫ���̣���������ͳ���ɶ���������԰������� MySQL �Ż�������ȡ�ľ��ߺͲ�����</p>
-<h1 id="2-ʹ�÷���"><a href="#2-ʹ�÷���" class="headerlink" title="2 ʹ�÷���"></a>2 ʹ�÷���</h1><p>�� MySQL 5.6 �Լ�֮��İ汾�У�MySQL�����һ�� optimizer trace �Ĺ��ܣ�������ܿ��������Ƿ���Ĳ鿴�Ż�������ִ�мƻ����������̣�������ܵĿ�����ر���ϵͳ���� optimizer_trace ������</p>
+          <p>注：本文基于MySQL8.0.32，优化器使用CBO成本模型。</p>
+<h1 id="1-功能概述"><a href="#1-功能概述" class="headerlink" title="1 功能概述"></a>1 功能概述</h1><p>此优化器可以跟踪执行语句的解析、优化、执行的全过程，生成人类和程序可读的输出，以帮助理解 MySQL 优化器所采取的决策和操作。</p>
+<h1 id="2-使用方法"><a href="#2-使用方法" class="headerlink" title="2 使用方法"></a>2 使用方法</h1><p>在 MySQL 5.6 以及之后的版本中，MySQL提出了一个 optimizer trace 的功能，这个功能可以让我们方便的查看优化器生成执行计划的整个过程，这个功能的开启与关闭由系统变量 optimizer_trace 决定：</p>
           <!--noindex-->
             <div class="post-button">
               <a class="btn" href="/2024/02/07/MySQL%E5%8A%9F%E8%83%BD%E4%BB%8B%E7%BB%8D%EF%BC%9A%E4%BD%BF%E7%94%A8Optimizer_Trace%E5%88%86%E6%9E%90%E4%BC%98%E5%8C%96%E5%99%A8%E8%A1%8C%E4%B8%BA/#more" rel="contents">
@@ -653,7 +653,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">6</span>
+        <span class="site-state-item-count">5</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
