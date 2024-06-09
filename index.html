@@ -193,7 +193,7 @@
               <span class="post-meta-item-text">发表于</span>
               
 
-              <time title="创建时间：2024-06-09 14:26:11 / 修改时间：14:30:39" itemprop="dateCreated datePublished" datetime="2024-06-09T14:26:11+08:00">2024-06-09</time>
+              <time title="创建时间：2024-06-09 14:26:11 / 修改时间：15:01:51" itemprop="dateCreated datePublished" datetime="2024-06-09T14:26:11+08:00">2024-06-09</time>
             </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -217,7 +217,7 @@
 
       
           <p>resolve主要对应prepare函数（sql&#x2F;sql_resolver.cc）。</p>
-<p>这个查询的处理在经过parse，基本就构成了最初级的抽象语法树(AST)，即这种query expression作为root的嵌套结构，prepare阶段主要完成2件事情</p>
+<p>查询语句在经过parse后，就构成了最初级的抽象语法树(AST)，即query expression作为root的嵌套结构。prepare阶段主要完成2件事情：</p>
 <ol>
 <li>负责对AST的resolve，包括所有涉及的tables&#x2F;columns，以及每一个查询中的表达式(Item)。对子查询进行初步解析，尝试是否可以合并到外层；</li>
 <li>基于启发式规则，完成一些query transformation，包括将子查询转换为semi-join，outer join简化为inner join，derived table展开到上层，消除常量表达式等。</li>
