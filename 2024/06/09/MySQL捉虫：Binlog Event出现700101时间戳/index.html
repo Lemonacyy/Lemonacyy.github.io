@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.1.1">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"lemonacyy.github.io","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="1 现象DBA报了一个问题，说是Binlog Event的时间戳出现了700101，版本是 MySQL 5.6.49。  虽然是很老的版本了，但国内还有不少人用，既然自己遇到了并且查清楚了，就顺手记录一下。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MySQL捉虫：glibc导致mysqld_safe无法启动">
+<meta property="og:url" content="https://lemonacyy.github.io/2024/06/09/MySQL%E6%8D%89%E8%99%AB%EF%BC%9ABinlog%20Event%E5%87%BA%E7%8E%B0700101%E6%97%B6%E9%97%B4%E6%88%B3/index.html">
+<meta property="og:site_name" content="LEMONACY&#39;S HOUSE">
+<meta property="og:description" content="1 现象DBA报了一个问题，说是Binlog Event的时间戳出现了700101，版本是 MySQL 5.6.49。  虽然是很老的版本了，但国内还有不少人用，既然自己遇到了并且查清楚了，就顺手记录一下。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://pic.imgdb.cn/item/66654a175e6d1bfa0585d69c.png">
+<meta property="article:published_time" content="2024-06-09T06:13:51.000Z">
+<meta property="article:modified_time" content="2024-06-09T06:57:02.992Z">
+<meta property="article:author" content="lemonacy">
+<meta property="article:tag" content="MySQL">
+<meta property="article:tag" content="Bugs">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://pic.imgdb.cn/item/66654a175e6d1bfa0585d69c.png">
+
+<link rel="canonical" href="https://lemonacyy.github.io/2024/06/09/MySQL%E6%8D%89%E8%99%AB%EF%BC%9ABinlog%20Event%E5%87%BA%E7%8E%B0700101%E6%97%B6%E9%97%B4%E6%88%B3/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>MySQL捉虫：glibc导致mysqld_safe无法启动 | LEMONACY'S HOUSE</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">LEMONACY'S HOUSE</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Make Lemons into Lemonade</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-日记">
+
+    <a href="/diary/" rel="section"><i class="fa fa-archive fa-fw"></i>日记</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://lemonacyy.github.io/2024/06/09/MySQL%E6%8D%89%E8%99%AB%EF%BC%9ABinlog%20Event%E5%87%BA%E7%8E%B0700101%E6%97%B6%E9%97%B4%E6%88%B3/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/uploads/avatar.jpg">
+      <meta itemprop="name" content="lemonacy">
+      <meta itemprop="description" content="Make Lemons into Lemonade">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="LEMONACY'S HOUSE">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          MySQL捉虫：glibc导致mysqld_safe无法启动
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2024-06-09 14:13:51 / 修改时间：14:57:02" itemprop="dateCreated datePublished" datetime="2024-06-09T14:13:51+08:00">2024-06-09</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index"><span itemprop="name">MySQL</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="1-现象"><a href="#1-现象" class="headerlink" title="1 现象"></a>1 现象</h2><p>DBA报了一个问题，说是Binlog Event的时间戳出现了700101，版本是 MySQL 5.6.49。</p>
+<blockquote>
+<p>虽然是很老的版本了，但国内还有不少人用，既然自己遇到了并且查清楚了，就顺手记录一下。</p>
+</blockquote>
+<span id="more"></span>
+
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_">$ </span><span class="language-bash"><span class="built_in">cat</span>  <span class="built_in">log</span>/mysql-bin.000005.sql</span></span><br><span class="line">/*!50530 SET @@SESSION.PSEUDO_SLAVE_MODE=1*/;</span><br><span class="line">/*!40019 SET @@session.max_insert_delayed_threads=0*/;</span><br><span class="line">/*!50003 SET @OLD_COMPLETION_TYPE=@@COMPLETION_TYPE,COMPLETION_TYPE=0*/;</span><br><span class="line">DELIMITER /*!*/;</span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">at 4</span></span><br><span class="line"><span class="meta prompt_">#</span><span class="language-bash">700101  8:00:00 server <span class="built_in">id</span> 2680489852  end_log_pos 120 CRC32 0x80775fa2     Start: binlog v 4, server v 5.6.49-2.0.0.2-<span class="built_in">log</span> created 700101  8:00:00</span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">Warning: this binlog is either <span class="keyword">in</span> use or was not closed properly.</span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">at 120</span></span><br><span class="line"><span class="meta prompt_">#</span><span class="language-bash">700101  8:00:00 server <span class="built_in">id</span> 2680489852  end_log_pos 191 CRC32 0x9d9d0d24     Previous-GTIDs</span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">41897c6e-2219-11ef-a135-fa202031598c:1-2</span></span><br><span class="line">DELIMITER ;</span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">End of <span class="built_in">log</span> file</span></span><br><span class="line">ROLLBACK /* added by mysqlbinlog */;</span><br><span class="line">/*!50003 SET COMPLETION_TYPE=@OLD_COMPLETION_TYPE*/;</span><br><span class="line">/*!50530 SET @@SESSION.PSEUDO_SLAVE_MODE=0*/;</span><br></pre></td></tr></table></figure>
+
+<p>注：8:00:00是加上了北京时区的时间，实际上是全0的时间戳</p>
+<h1 id="2-调查"><a href="#2-调查" class="headerlink" title="2 调查"></a>2 调查</h1><p>发现errlog里会有如下信息：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line">Status information:</span><br><span class="line"></span><br><span class="line">Current dir: # 我省略掉了</span><br><span class="line">Running threads: 0  Stack size: 196608</span><br><span class="line">Current locks:</span><br><span class="line">lock: 0x7fbd720c5760:</span><br><span class="line"></span><br><span class="line">lock: 0x7fbd7220bc80:</span><br><span class="line"></span><br><span class="line">lock: 0x7fbd7220b8c0:</span><br><span class="line"></span><br><span class="line">lock: 0x7fbd7220b780:</span><br><span class="line"></span><br><span class="line">lock: 0x7fbd72112f60:</span><br><span class="line"></span><br><span class="line">lock: 0x7fbd7210fd60:</span><br><span class="line"></span><br><span class="line">lock: 0x7fbd72121f60:</span><br><span class="line"></span><br><span class="line">lock: 0x7fbd72154960:</span><br><span class="line"></span><br><span class="line">lock: 0x7fbd72150360:</span><br><span class="line"></span><br><span class="line">lock: 0x7fbe51fc8160:</span><br><span class="line"></span><br><span class="line">lock: 0x7fbe1712a360:</span><br><span class="line"></span><br><span class="line">lock: 0x14cb5c0:</span><br><span class="line"></span><br><span class="line">lock: 0x14cb500:</span><br><span class="line"></span><br><span class="line">lock: 0x14ca780:</span><br><span class="line"></span><br><span class="line">lock: 0x14ca6c0:</span><br><span class="line"></span><br><span class="line">lock: 0x14ca600:</span><br><span class="line"></span><br><span class="line"># 略</span><br></pre></td></tr></table></figure>
+
+<p>这是SIGHUP信号导致的（<a target="_blank" rel="noopener" href="https://dev.mysql.com/doc/refman/5.7/en/unix-signal-response.html%EF%BC%89%EF%BC%8C">https://dev.mysql.com/doc/refman/5.7/en/unix-signal-response.html），</a><br>&#x2F;proc&#x2F;$PID&#x2F;status的SigCgt 也可以表示当前进程捕获到了SIGHUP信号：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">SigPnd: 0000000000000000</span><br><span class="line">ShdPnd: 0000000000000000</span><br><span class="line">SigBlk: 0000000000087007</span><br><span class="line">SigIgn: 0000000000001006</span><br><span class="line">SigCgt: 00000001800066e9</span><br></pre></td></tr></table></figure>
+
+<p>SigCgt每一位代表一个信号：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_">$ </span><span class="language-bash"><span class="built_in">kill</span> -l</span></span><br><span class="line"> 1) SIGHUP       2) SIGINT       3) SIGQUIT      4) SIGILL       5) SIGTRAP</span><br><span class="line"> 6) SIGABRT      7) SIGBUS       8) SIGFPE       9) SIGKILL     10) SIGUSR1</span><br><span class="line">11) SIGSEGV     12) SIGUSR2     13) SIGPIPE     14) SIGALRM     15) SIGTERM</span><br><span class="line">16) SIGSTKFLT   17) SIGCHLD     18) SIGCONT     19) SIGSTOP     20) SIGTSTP</span><br><span class="line">21) SIGTTIN     22) SIGTTOU     23) SIGURG      24) SIGXCPU     25) SIGXFSZ</span><br><span class="line">26) SIGVTALRM   27) SIGPROF     28) SIGWINCH    29) SIGIO       30) SIGPWR</span><br><span class="line">31) SIGSYS      34) SIGRTMIN    35) SIGRTMIN+1  36) SIGRTMIN+2  37) SIGRTMIN+3</span><br><span class="line">38) SIGRTMIN+4  39) SIGRTMIN+5  40) SIGRTMIN+6  41) SIGRTMIN+7  42) SIGRTMIN+8</span><br><span class="line">43) SIGRTMIN+9  44) SIGRTMIN+10 45) SIGRTMIN+11 46) SIGRTMIN+12 47) SIGRTMIN+13</span><br><span class="line">48) SIGRTMIN+14 49) SIGRTMIN+15 50) SIGRTMAX-14 51) SIGRTMAX-13 52) SIGRTMAX-12</span><br><span class="line">53) SIGRTMAX-11 54) SIGRTMAX-10 55) SIGRTMAX-9  56) SIGRTMAX-8  57) SIGRTMAX-7</span><br><span class="line">58) SIGRTMAX-6  59) SIGRTMAX-5  60) SIGRTMAX-4  61) SIGRTMAX-3  62) SIGRTMAX-2</span><br><span class="line">63) SIGRTMAX-1  64) SIGRTMAX</span><br></pre></td></tr></table></figure>
+
+<p>可以确认mysqld进程收到了SIGHUP信号。</p>
+<p>SIGHUP会导致实例重新装载grant table、flush tables、flush logs、flush 各种缓存，有点类似于重启实例。</p>
+<p>mysqld调用函数signal_hand处理接收到的信号，如果是SIGHUP信号，会调用函数reload_acl_and_cache来执行刚才所说的一系列操作：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">#<span class="number">0</span>  <span class="built_in">reload_acl_and_cache</span> (thd=<span class="number">0x0</span>, options=<span class="number">32815</span>, tables=<span class="number">0x0</span>, write_to_binlog=<span class="number">0x7fbd721af5dc</span>)</span><br><span class="line">#<span class="number">1</span>  <span class="number">0x000000000069dd3d</span> <span class="function">in <span class="title">signal_hand</span> <span class="params">(arg=<span class="number">0x0</span>)</span> </span></span><br></pre></td></tr></table></figure>
+
+<p>需要注意的是函数reload_acl_and_cache的输入参数中，thd的值是空的：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">pthread_handler_t</span> <span class="title">signal_hand</span><span class="params">(<span class="type">void</span> *arg MY_ATTRIBUTE((unused)))</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">  <span class="comment">// ... 省略一些无关代码</span></span><br><span class="line">      <span class="keyword">switch</span> (sig) &#123;</span><br><span class="line">    <span class="keyword">case</span> SIGHUP:</span><br><span class="line">      <span class="keyword">if</span> (!abort_loop)</span><br><span class="line">      &#123;</span><br><span class="line">        <span class="type">int</span> not_used;</span><br><span class="line">        <span class="built_in">mysql_print_status</span>();   <span class="comment">// Print some debug info</span></span><br><span class="line">        <span class="built_in">reload_acl_and_cache</span>((THD*) <span class="number">0</span>,</span><br><span class="line">                             (REFRESH_LOG | REFRESH_TABLES | REFRESH_FAST |</span><br><span class="line">                              REFRESH_GRANT |</span><br><span class="line">                              REFRESH_THREADS | REFRESH_HOSTS),</span><br><span class="line">                             (TABLE_LIST*) <span class="number">0</span>, &amp;not_used); <span class="comment">// Flush logs</span></span><br><span class="line">      &#125;</span><br><span class="line">      <span class="comment">/* reenable logs after the options were reloaded */</span></span><br><span class="line">      <span class="comment">// ...省略一些无关代码</span></span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">  <span class="comment">// ...省略一些无关代码</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在函数reload_acl_and_cache中，会调用类似flush binary logs的逻辑，结束当前binlog，开启下一个binlog。</p>
+<p>但是，正如之前所说，传入该函数的thd为空值，所以这个函数会new一个新的thd，但是MySQL5.6的逻辑中，THD的构造函数和初始化都没有设置时间，set_globals函数也没有设置时间，这就导致刷新日志时，当前线程的时间都是0（或者说不确定值，取决于编译器）</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line">  <span class="keyword">if</span> ((options &amp; REFRESH_BINARY_LOG) || (options &amp; REFRESH_RELAY_LOG ))</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="comment">/*</span></span><br><span class="line"><span class="comment">      If reload_acl_and_cache() is called from SIGHUP handler we have to</span></span><br><span class="line"><span class="comment">      allocate temporary THD for execution of binlog/relay log rotation.</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    THD *tmp_thd= <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">if</span> (!thd &amp;&amp; (thd= (tmp_thd= <span class="keyword">new</span> THD)))</span><br><span class="line">    &#123;</span><br><span class="line">      thd-&gt;thread_stack= (<span class="type">char</span> *) (&amp;tmp_thd);</span><br><span class="line">      thd-&gt;<span class="built_in">store_globals</span>();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (options &amp; REFRESH_BINARY_LOG)</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="comment">/*</span></span><br><span class="line"><span class="comment">        Writing this command to the binlog may result in infinite loops</span></span><br><span class="line"><span class="comment">        when doing mysqlbinlog|mysql, and anyway it does not really make</span></span><br><span class="line"><span class="comment">        sense to log it automatically (would cause more trouble to users</span></span><br><span class="line"><span class="comment">        than it would help them)</span></span><br><span class="line"><span class="comment">       */</span></span><br><span class="line">      tmp_write_to_binlog= <span class="number">0</span>;</span><br><span class="line">      <span class="keyword">if</span> (mysql_bin_log.<span class="built_in">is_open</span>())</span><br><span class="line">      &#123;</span><br><span class="line">        <span class="keyword">if</span> (mysql_bin_log.<span class="built_in">rotate_and_purge</span>(thd, <span class="literal">true</span>))</span><br><span class="line">          *write_to_binlog= <span class="number">-1</span>;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 之后略</span></span><br></pre></td></tr></table></figure>
+
+<p>之后在写入binlog event时，可以看到：</p>
+<p><img src="https://pic.imgdb.cn/item/66654a175e6d1bfa0585d69c.png" alt="gdb_pic"></p>
+<p>这就导致binlog日志出现了700101的时间戳。</p>
+<h1 id="3-解决方案"><a href="#3-解决方案" class="headerlink" title="3 解决方案"></a>3 解决方案</h1><p>在THD::init()函数中设置线程时间为当前时间即可。</p>
+<p>MySQL在5.7.5之后的版本和8.0的全部版本都修复了这个问题，可以参考相关patch：<a target="_blank" rel="noopener" href="https://github.com/mysql/mysql-server/commit/917fc1b47c14e560e598bfed787e699b3096d4bf">https://github.com/mysql/mysql-server/commit/917fc1b47c14e560e598bfed787e699b3096d4bf</a></p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/MySQL/" rel="tag"># MySQL</a>
+              <a href="/tags/Bugs/" rel="tag"># Bugs</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2024/04/27/MySQL%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%9A%E4%BC%98%E5%8C%96%E5%99%A8%E6%B7%B1%E6%BD%9C%EF%BC%88%E4%B8%80%EF%BC%89-SELECT%E7%9A%84%E8%AF%AD%E6%B3%95%E6%A0%91%E7%BB%93%E6%9E%84/" rel="prev" title="MySQL源码分析：优化器深潜（一）- SELECT的语法树结构">
+      <i class="fa fa-chevron-left"></i> MySQL源码分析：优化器深潜（一）- SELECT的语法树结构
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2024/06/09/MySQL%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%9A%E4%BC%98%E5%8C%96%E5%99%A8%E6%B7%B1%E6%BD%9C%EF%BC%88%E4%BA%8C%EF%BC%89%20-%20PREPARE%E7%9A%84%E6%89%A7%E8%A1%8C%E9%80%BB%E8%BE%91/" rel="next" title="MySQL源码分析：优化器深潜（二）- PREPARE的执行逻辑">
+      MySQL源码分析：优化器深潜（二）- PREPARE的执行逻辑 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-%E7%8E%B0%E8%B1%A1"><span class="nav-text">1 现象</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E8%B0%83%E6%9F%A5"><span class="nav-text">2 调查</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88"><span class="nav-text">3 解决方案</span></a></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="lemonacy"
+      src="/uploads/avatar.jpg">
+  <p class="site-author-name" itemprop="name">lemonacy</p>
+  <div class="site-description" itemprop="description">Make Lemons into Lemonade</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">8</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">2</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="mailto:licy0304@163.com" title="E-Mail → mailto:licy0304@163.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2024</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">lemonacy</span>
+</div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+<script>
+document.querySelectorAll('.pdfobject-container').forEach(element => {
+  let url = element.dataset.target;
+  let pdfOpenParams = {
+    navpanes : 0,
+    toolbar  : 0,
+    statusbar: 0,
+    pagemode : 'thumbs',
+    view     : 'FitH'
+  };
+  let pdfOpenFragment = '#' + Object.entries(pdfOpenParams).map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join('&');
+  let fullURL = `/lib/pdf/web/viewer.html?file=${encodeURIComponent(url)}${pdfOpenFragment}`;
+
+  if (NexT.utils.supportsPDFs()) {
+    element.innerHTML = `<embed class="pdfobject" src="${url + pdfOpenFragment}" type="application/pdf" style="height: ${element.dataset.height};">`;
+  } else {
+    element.innerHTML = `<iframe src="${fullURL}" style="height: ${element.dataset.height};" frameborder="0"></iframe>`;
+  }
+});
+</script>
+
+
+
+
+  
+
+  
+
+</body>
+</html>
