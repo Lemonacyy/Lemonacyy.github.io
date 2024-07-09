@@ -31,7 +31,7 @@
 <meta property="og:image" content="https://pic.imgdb.cn/item/668d5518d9c307b7e9872c6f.png">
 <meta property="og:image" content="https://pic.imgdb.cn/item/668d5518d9c307b7e9872c8d.png">
 <meta property="article:published_time" content="2024-07-09T15:53:51.000Z">
-<meta property="article:modified_time" content="2024-07-09T15:43:35.893Z">
+<meta property="article:modified_time" content="2024-07-09T15:51:45.004Z">
 <meta property="article:author" content="lemonacy">
 <meta property="article:tag" content="MySQL">
 <meta property="article:tag" content="Bugs">
@@ -202,7 +202,7 @@
               <span class="post-meta-item-text">发表于</span>
               
 
-              <time title="创建时间：2024-07-09 23:53:51 / 修改时间：23:43:35" itemprop="dateCreated datePublished" datetime="2024-07-09T23:53:51+08:00">2024-07-09</time>
+              <time title="创建时间：2024-07-09 23:53:51 / 修改时间：23:51:45" itemprop="dateCreated datePublished" datetime="2024-07-09T23:53:51+08:00">2024-07-09</time>
             </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -230,7 +230,7 @@
 <span id="more"></span>
 
 <h1 id="1-背景"><a href="#1-背景" class="headerlink" title="1 背景"></a>1 背景</h1><p>关于权限管理，管控反馈了一个问题：</p>
-<p>在MySQL的官方文档（<a target="_blank" rel="noopener" href="https://dev.mysql.com/doc/refman/8.0/en/privilege-changes.html%EF%BC%89%E7%9C%8B%E6%9C%89%E5%A6%82%E4%B8%8B%E8%A7%84%E5%88%99%EF%BC%9A">https://dev.mysql.com/doc/refman/8.0/en/privilege-changes.html）看有如下规则：</a></p>
+<p>在MySQL的官方文档（<a target="_blank" rel="noopener" href="https://dev.mysql.com/doc/refman/8.0/en/privilege-changes.html%EF%BC%89">https://dev.mysql.com/doc/refman/8.0/en/privilege-changes.html）</a> 看有如下规则：</p>
 <ol>
 <li>全局权限：更改仅在后续连接的会话中生效</li>
 <li>库权限：更改将在客户机下次执行 USE db_name 语句时生效。 （客户端应用程序可能会缓存数据库名称;因此如果不实际更改为其他数据库，可能无法看到生效效果。）</li>
@@ -240,13 +240,13 @@
 <p>在客户端连接情况下，给账户 db 写入权限，然后把权限回收，use db 报错无权限，但依旧可以写入到 db 下的表。只有重新连接后才能生效。show grants 查看我们的授权和回收的展示结果都是符合预期的。需要内核确认权限行为的生效时机。</p>
 <p><img src="https://pic.imgdb.cn/item/668d5482d9c307b7e9865343.png" alt="xianxiang"></p>
 <h1 id="2-省流版结论"><a href="#2-省流版结论" class="headerlink" title="2 省流版结论"></a>2 省流版结论</h1><p>MySQL 的权限逻辑是这样：全局权限、DB权限和表&#x2F;列权限分别由不同的结构来管理，每次 grant 和 revoke 的时候，这三个结构的内容都会刷新，一般情况下，都会用这几个结构的内容来做权限判断。</p>
-<p>USE DB走的是 <code>check_grant_db</code> 的逻辑，判断库级别有没有权限。</p>
+<p><code>USE db</code> 走的是 <code>check_grant_db</code> 的逻辑，判断库级别有没有权限。</p>
 <p>对表进行操作，首先会通过 <code>check_access</code> 检查有没有全局和库级别的权限，如果没有，接着走 <code>check_grant</code> 判断有没有表的权限。</p>
 <p>也许是出于性能优化的考虑，如果之前执行过 <code>USE db</code> ，MySQL 会把对应 db 的权限保存在 <code>thd-&gt;sctx</code> 里，下次再用到的时候直接读取，不会重新再查询对 db 的访问权限。</p>
-<p>也就是说，如果之前操作过 <code>USE db</code> ，对这个db的访问权限会保存在 thd 里，如果继续访问 db 下面的表，会直接使用这个保存的访问权限，也就出现了可以继续访问db下的表的情况。</p>
-<p>在这种情况下，如果使用了 <code>USE other_db</code> ，切换了db，再做查询就查不到了：</p>
+<p>也就是说，如果之前操作过 <code>USE db</code> ，对这个 db 的访问权限会保存在 thd 里，如果继续访问 db 下面的表，会直接使用这个保存的访问权限，也就出现了可以继续访问 db 下的表的情况。</p>
+<p>在这种情况下，如果使用了 <code>USE other_db</code> ，切换了 db，再做查询就查不到了：</p>
 <p><img src="https://pic.imgdb.cn/item/668d5518d9c307b7e9872c6f.png" alt="2"></p>
-<p>而且，如果切换的db没有权限，db没有切换成功，thd里保存的db权限也不会重写：</p>
+<p>而且，如果切换的 db 没有权限，db 没有切换成功，thd 里保存的 db 权限也不会重写：</p>
 <p><img src="https://pic.imgdb.cn/item/668d5518d9c307b7e9872c8d.png" alt="3"></p>
 <h1 id="3-代码梳理"><a href="#3-代码梳理" class="headerlink" title="3 代码梳理"></a>3 代码梳理</h1><h2 id="3-1-权限存储"><a href="#3-1-权限存储" class="headerlink" title="3.1 权限存储"></a>3.1 权限存储</h2><p>GRANT 语句赋予对应用户相应的权限，会根据不同的语法存储到不同的表中：</p>
 <ul>
@@ -291,7 +291,7 @@
 <figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">    Global privileges from mysql.user.</span></span><br><span class="line"><span class="comment">  */</span></span><br><span class="line">  ulong m_master_access;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
 
 <p>回到 <code>check_access</code> 函数，<code>sctx-&gt;check_access</code> 就是函数 <code>Security_context::check_access</code>：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">  <span class="keyword">if</span> (sctx-&gt;<span class="built_in">check_access</span>(want_access, db_name)) &#123;</span><br><span class="line">    <span class="keyword">if</span> (!(sctx-&gt;<span class="built_in">check_access</span>(SELECT_ACL, db_name))) &#123;</span><br><span class="line">      <span class="keyword">if</span> (db &amp;&amp;</span><br><span class="line">          (!thd-&gt;<span class="built_in">db</span>().str || db_is_pattern || <span class="built_in">strcmp</span>(db, thd-&gt;<span class="built_in">db</span>().str))) &#123;</span><br><span class="line">        <span class="keyword">if</span> (sctx-&gt;<span class="built_in">get_active_roles</span>()-&gt;<span class="built_in">size</span>() &gt; <span class="number">0</span>) &#123;</span><br><span class="line">          db_access = sctx-&gt;<span class="built_in">db_acl</span>(&#123;db, <span class="built_in">strlen</span>(db)&#125;, db_is_pattern);</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">          db_access = <span class="built_in">acl_get</span>(thd, sctx-&gt;<span class="built_in">host</span>().str, sctx-&gt;<span class="built_in">ip</span>().str,</span><br><span class="line">                              sctx-&gt;<span class="built_in">priv_user</span>().str, db, db_is_pattern);</span><br><span class="line">        &#125;</span><br><span class="line">      &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="comment">/* get access for current db */</span></span><br><span class="line">        d</span><br><span class="line">      *save_priv |= sctx-&gt;<span class="built_in">master_access</span>(db_name) | db_access;</span><br><span class="line">    &#125; <span class="keyword">else</span></span><br><span class="line">      *save_priv |= sctx-&gt;<span class="built_in">master_access</span>(db_name);</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">  <span class="keyword">if</span> (sctx-&gt;<span class="built_in">check_access</span>(want_access, db_name)) &#123;</span><br><span class="line">    <span class="keyword">if</span> (!(sctx-&gt;<span class="built_in">check_access</span>(SELECT_ACL, db_name))) &#123;</span><br><span class="line">      <span class="keyword">if</span> (db &amp;&amp;</span><br><span class="line">          (!thd-&gt;<span class="built_in">db</span>().str || db_is_pattern || <span class="built_in">strcmp</span>(db, thd-&gt;<span class="built_in">db</span>().str))) &#123;</span><br><span class="line">        <span class="keyword">if</span> (sctx-&gt;<span class="built_in">get_active_roles</span>()-&gt;<span class="built_in">size</span>() &gt; <span class="number">0</span>) &#123;</span><br><span class="line">          db_access = sctx-&gt;<span class="built_in">db_acl</span>(&#123;db, <span class="built_in">strlen</span>(db)&#125;, db_is_pattern);</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">          db_access = <span class="built_in">acl_get</span>(thd, sctx-&gt;<span class="built_in">host</span>().str, sctx-&gt;<span class="built_in">ip</span>().str,</span><br><span class="line">                              sctx-&gt;<span class="built_in">priv_user</span>().str, db, db_is_pattern);</span><br><span class="line">        &#125;</span><br><span class="line">      &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="comment">/* get access for current db */</span></span><br><span class="line">      *save_priv |= sctx-&gt;<span class="built_in">master_access</span>(db_name) | db_access;</span><br><span class="line">    &#125; <span class="keyword">else</span></span><br><span class="line">      *save_priv |= sctx-&gt;<span class="built_in">master_access</span>(db_name);</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
 
 <p><code>want_access</code> 表示需要的权限。中间代码是说如果全局权限满足了 <code>want_access</code> ，但是没有全局的SELECT权限，还要去看一下有没有指定db的SELECT权限。</p>
 <p>试了几个都没有出现没有SELECT_ACL的情况（比如INSERT的 <code>want_access</code> 就是INSERT+SELECT &#x3D; 2），看代码逻辑是这样，先记录一下。</p>
@@ -306,7 +306,7 @@
 <figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">  <span class="keyword">if</span> (db == any_db) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
 
 <p>如果之前有用过<code>USE db</code> 切到过其他 db，再 select 另外 db 下的表，会走第一个逻辑，否则会走 else 逻辑。</p>
-<p>else比较好理解，<code>sctx-&gt;current_db_access()</code> 就是对当前 db 具有的权限，就是之前已经找到过权限了，直接继承之前找到过的记录，对应if的逻辑就是thd里没有存db的权限或者db不是要找的这个db，所以再找一遍db的权限。</p>
+<p>else 比较好理解，<code>sctx-&gt;current_db_access()</code> 就是对当前 db 具有的权限，就是之前已经找到过权限了，直接继承之前找到过的记录，对应if的逻辑就是thd里没有存db的权限或者db不是要找的这个 db，所以再找一遍db的权限。</p>
 <blockquote>
 <p>这里就是开头说的问题的原因～</p>
 </blockquote>
